@@ -3,10 +3,13 @@
 #include <assert.h>
 
 int main() {
-  auto success = chisato::Parse("./test.conf");
+  std::string errmsg;
+  auto success = chisato::Parse("./test.conf", errmsg);
   
-  assert(success);
-  
+  if (!success) {
+    ::fprintf(stderr, "Failed to parse the config: %s\n", errmsg.c_str());
+    return 0;
+  }
   auto value1 = chisato::GetField("field1");
   auto value2 = chisato::GetField("field2");
   auto value3 = chisato::GetField("field3");

@@ -15,13 +15,15 @@ field1: value1
 
 ## Usage
 ```cpp
-auto success = chisato::Parse(path-name);
+std::string errmsg;
+auto success = chisato::Parse(path-name, errmsg);
 if (success) {
   auto value1 = chisato::GetField(field-name);
   // ...
   // do something
 } else {
   // do something
+  ::fprintf(stderr, "Failed to parse the config: %s\n", errmsg.c_str());
   // e.g. exit()
 }
 ```
