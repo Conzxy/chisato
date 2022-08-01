@@ -25,6 +25,7 @@ struct Config {
   double dfield = 1.0;
   TestEnum efield;
   TestEnum efield2;
+  bool boolean = false;
 };
 
 static inline void conv_efield(StrSlice value, void *args) {
@@ -48,6 +49,7 @@ int main(int argc, char **argv) {
   chisato::AddConfig("enum1", [&config](StrSlice value) {
       conv_efield(value, &config.efield2);
   });
+  chisato::AddConfig("bool", &config.boolean);
   
   char const *path = "./test.conf"; 
   if (argc == 2) {
@@ -71,6 +73,7 @@ int main(int argc, char **argv) {
   ::printf("dfield = %lf\n", config.dfield);
   ::printf("enum = %s\n", get_enum_str(config.efield));
   ::printf("enum1 = %s\n", get_enum_str(config.efield2));
+  ::printf("bool = %d\n", (int)config.boolean);
   
   ::printf("sizeof ConfigData = %zu\n", sizeof(chisato::ConfigData));
   chisato::DebugPrint();

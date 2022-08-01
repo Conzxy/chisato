@@ -31,6 +31,13 @@ struct StrSlice {
   size_t len() const noexcept { return len_; }  
   
   std::string toString() const { return std::string(data_, len_); }
+  int caseCmp(StrSlice const &o) const noexcept {
+    auto const res = ::strncasecmp(o.data_, data_, o.len_ < len_ ? o.len_ : len_);
+    // If length is equal, result is expected
+    // Otherwise, length is not equal, and the compare result indicates
+    // them are equivalent, the shorter slice is smaller.
+    return (len_ != o.len_ && res == 0)? ((len_ < o.len_) ? -1 : 1) : res;
+  }
 
   char operator[](size_t idx) const noexcept {
     assert(idx < len_);

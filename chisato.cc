@@ -139,6 +139,20 @@ bool Parse(char const *path, std::string &errmsg) {
                 ((std::string*)(data->data))->assign(value.data(), value.size());
               }
               break;
+              
+              case CT_BOOL: {
+                auto boolean_field = (bool*)(data->data);
+                if (value.caseCmp(StrSlice("on", 2)) == 0) {
+                  *boolean_field = true;
+                } else if (value.caseCmp(StrSlice("off", 3)) == 0) {
+                  *boolean_field = false;
+                } else {
+                  errmsg += "Syntax error: Invalid boolean field, "
+                    "must be 'on' or 'off'(case-intensive)";
+                  return false;
+                }
+              }
+              break;
 
               case CT_USR_DEF: {
                 assert(false && "Set callback to handle user-defined config type");

@@ -21,6 +21,7 @@ enum ConfigType : uint8_t {
   CT_LONG,    /** long    */
   CT_FLOAT,   /** floating-point */
   CT_STR,     /** string */
+  CT_BOOL,    /** boolean */
   CT_USR_DEF, /** user-defined type */
 };
 
@@ -38,7 +39,7 @@ struct ConfigClosure {
 
 /** Config metadata */
 struct ConfigData {
-  ConfigType type;           /** Reinterpret data */
+  ConfigType type;           /** interpret data */
 
   enum : uint8_t {
     CD_RAW = 0,      /** predefined data */
@@ -138,6 +139,10 @@ inline void AddConfig(char const *field, long *l) {
 
 inline void AddConfig(char const *field, double * d) {
   AddConfig_(field, ConfigData{ CT_FLOAT, d });
+}
+
+inline void AddConfig(char const *field, bool *b) {
+  AddConfig_(field, ConfigData{ CT_BOOL, b });
 }
 
 /**
