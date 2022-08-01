@@ -9,53 +9,109 @@
 
 namespace chisato {
 
-/* Global structure definition */
-ConfigMap config_map;
+/** 
+ * Support integer, floating-point, and string
+ */
+enum ConfigType : uint8_t {
+  CT_INT = 0, /** integer */
+  CT_LONG,    /** long    */
+  CT_FLOAT,   /** floating-point */
+  CT_STR,     /** string */
+  CT_BOOL,    /** boolean */
+  CT_USR_DEF, /** user-defined type */
+};
+
+/** Callback with generic parameters */
+struct ConfigClosure {
+  ConfigCallback config_cb = nullptr;
+  void *args = nullptr;
+};
+
+/** Config metadata */
+struct ConfigData {
+  ConfigType type;           /** interpret data */
+
+  enum : uint8_t {
+    CD_RAW = 0,      /** predefined data */
+    CD_C_CALLBACK,   /** C callback */
+    CD_CPP_CALLBACK, /** Cpp callback */
+  } set_method;
+  
+  /* Decrease the space usage */
+  union {
+    void *data;                /** Binding the field data */
+    ConfigClosure config_cs;   /** C style callback */
+    ConfigFunction config_fn;  /** Cpp style callback */
+  };
+
+  ConfigData(ConfigType t, void *d)
+    : type(t)
+    , set_method(CD_RAW)
+    , data(d)
+  {
+  }
+
+  ConfigData(ConfigType t, ConfigClosure cc)
+    : type(t)
+    , set_method(CD_C_CALLBACK)
+    , config_cs(cc)
+  {
+  }
+  
+  ConfigData(ConfigType t, ConfigFunction fn)
+    : type(t)
+    , set_method(CD_CPP_CALLBACK)
+    , config_fn(fn)
+  {
+  }
+
+  ConfigData(ConfigData && other) noexcept 
+    : type(other.type)
+    , set_method(other.set_method)
+  {
+    switch (other.set_method) {
+      case CD_RAW:
+        data = other.data;
+        break;
+      case CD_C_CALLBACK:
+        config_cs = other.config_cs;
+        break;
+      case CD_CPP_CALLBACK:
+        config_fn = std::move(other.config_fn);
+        break;
+    }
+  }
+  
+  ~ConfigData() noexcept {
+    if (set_method == CD_CPP_CALLBACK) {
+      config_fn.~ConfigFunction();
+    }
+  }
+};
+
+
+namespace detail {
+
+struct StrSliceHash {
+  size_t operator()(StrSlice str) const noexcept {
+    size_t h = 5321;
+    for (size_t i = 0; i < str.size(); ++i) {
+      h = (h << 5) + h + str[i];
+    }
+
+    return h;
+  }
+};
+
+} // detail
+
+using ConfigMap = std::unordered_map<StrSlice, ConfigData, detail::StrSliceHash>;
+
+/** <Config name> -> <Config metadata> */
+static ConfigMap config_map;
 
 /* Read a line from file */
-static inline bool ReadLine(FILE* file, std::string& line, const bool need_newline=true) {
-  char buf[MAX_LINE_LEN];
-  char* ret = NULL;
-  size_t n = 0;
-
-  line.clear();
-
-  do {
-    ret = ::fgets(buf, sizeof buf, file);
-
-    if (ret == NULL) {
-      if (::ferror(file)) {
-        if (errno == EINTR) {
-          continue;
-        }
-      }
-
-      return false;
-    }
-
-    assert(ret == buf);
-    n = strlen(buf);
-
-    if (n >= 1 && buf[n-1] == '\n') {
-      if (!need_newline) {
-        if (n >= 2 && buf[n-2] == '\r') {
-          line.append(buf, n - 2);
-        }
-        else {
-          line.append(buf, n - 1);
-        }
-      } else {
-        line.append(buf, n);
-      }
-      break;
-    }
-
-    line.append(buf, n);
-
-  } while (n == (sizeof(buf) - 1));
-
-  return true;
-}
+static bool ReadLine(FILE* file, std::string& line, const bool need_newline=true) ;
 
 #define STR2INT(ivar) \
   char *end = nullptr; \
@@ -66,6 +122,48 @@ static inline bool ReadLine(FILE* file, std::string& line, const bool need_newli
     return false; \
   } \
   (ivar) = res;
+
+/** Add config */
+static inline void AddConfig_(char const *field, ConfigData data) {
+  config_map.emplace(field, std::move(data));
+}
+
+void AddConfig(char const *field, std::string *str) {
+  AddConfig_(field, ConfigData{ CT_STR, str });
+}
+
+void AddConfig(char const *field, int *i) {
+  AddConfig_(field, ConfigData{ CT_INT, i });
+}
+
+void AddConfig(char const *field, long *l) {
+  AddConfig_(field, ConfigData{ CT_LONG, l });
+}
+
+void AddConfig(char const *field, double * d) {
+  AddConfig_(field, ConfigData{ CT_FLOAT, d });
+}
+
+void AddConfig(char const *field, bool *b) {
+  AddConfig_(field, ConfigData{ CT_BOOL, b });
+}
+
+void AddConfig(char const *field, void *args, ConfigCallback cb) {
+  config_map.emplace(field, ConfigData {
+    CT_USR_DEF,
+    ConfigClosure {
+      .config_cb = cb,
+      .args = args,
+    }
+  });
+}
+
+void AddConfig(char const *field, ConfigFunction cb) {
+  config_map.emplace(field, ConfigData {
+    CT_USR_DEF,
+    std::move(cb),
+  });
+}
 
 bool Parse(char const *path, std::string &errmsg) {
   FILE* file = ::fopen(path, "r");
@@ -202,12 +300,60 @@ bool Parse(char const *path, std::string &errmsg) {
   return true;
 }
 
+void Teardown() {
+  config_map.clear();
+}
+
 void DebugPrint() {
 #ifdef _CHISATO_DEBUG__
   for (auto const &config : config_map) {
     std::cout << std::string(config.first.data(), config.first.size()) << "\n";
   }
 #endif
+}
+
+static inline bool ReadLine(FILE* file, std::string& line, const bool need_newline) {
+  char buf[MAX_LINE_LEN];
+  char* ret = NULL;
+  size_t n = 0;
+
+  line.clear();
+
+  do {
+    ret = ::fgets(buf, sizeof buf, file);
+
+    if (ret == NULL) {
+      if (::ferror(file)) {
+        if (errno == EINTR) {
+          continue;
+        }
+      }
+
+      return false;
+    }
+
+    assert(ret == buf);
+    n = strlen(buf);
+
+    if (n >= 1 && buf[n-1] == '\n') {
+      if (!need_newline) {
+        if (n >= 2 && buf[n-2] == '\r') {
+          line.append(buf, n - 2);
+        }
+        else {
+          line.append(buf, n - 1);
+        }
+      } else {
+        line.append(buf, n);
+      }
+      break;
+    }
+
+    line.append(buf, n);
+
+  } while (n == (sizeof(buf) - 1));
+
+  return true;
 }
 
 } // chisato

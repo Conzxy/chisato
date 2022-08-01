@@ -74,7 +74,6 @@ int main(int argc, char **argv) {
   ::printf("enum = %s\n", get_enum_str(config.efield));
   ::printf("enum1 = %s\n", get_enum_str(config.efield2));
   ::printf("bool = %d\n", (int)config.boolean);
-  
-  ::printf("sizeof ConfigData = %zu\n", sizeof(chisato::ConfigData));
+
   chisato::DebugPrint();
 }
