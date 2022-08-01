@@ -26,17 +26,28 @@ int i = 0; // default: 0
 chisato::AddConfig("int", &i);
 // double, string same with int
 ```
-对于自定义字段类型，比如枚举类型，可以通过注册`回调`(callback)的方式设置，支持两种风格的回调：
+对于自定义字段类型，比如枚举类型，可以通过注册`回调`(callback)的方式解析并设置，其函数签名(signature)：
+```cpp
+/* \param value Value of field
+ * \return
+ *  true -- success
+ */
+bool(StrSlice value)
+```
+`StrSlice`是`std::string_view`(c++17)的一个不完整实现，仅满足该库需求，具体参见`str_slice.h`。
+
+`chisato`支持两种风格的回调：
 * C风格回调(C-style callback)
 ```cpp
-typedef void(*ConfigCallback)(StrSlice, void*);
+typedef bool(*ConfigCallback)(StrSlice, void*);
 ```
-`void*`是**泛型参数**(generic parameter)，用它捕获变量（模拟lambda，不过是具名函数）
+`void*`是**泛型参数**(generic parameter)，用它捕获变量（模拟lambda，不过是具名函数）。
+
 * Cpp风格回调(Cpp-style callback)
 ```cpp
-typedef std::function<void(StrSlice)> ConfigFunction;
+typedef std::function<bool(StrSlice)> ConfigFunction;
 ```
-cpp风格是采用`std::function<>`接受各种可调用对象（包括函数指针，lambda和函数对象）
+cpp风格是采用`std::function<>`接受各种可调用对象（包括函数指针，lambda和函数对象）。
 
 Example:
 ```cpp

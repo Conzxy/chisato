@@ -5,6 +5,8 @@
 #include <iostream>
 #endif
 
+#include <algorithm> // all_of
+
 #define MAX_LINE_LEN 4096
 
 namespace chisato {
@@ -184,10 +186,16 @@ bool Parse(char const *path, std::string &errmsg) {
   while (ReadLine(file, line, false)) {
     ++lineno;
     /* Get the comment position */
-    size_t end_pos = line.rfind('#');
-    if (end_pos != std::string::npos)
-      line.erase(end_pos, line.size());
+    size_t end_pos = -1;
+    for (size_t i = line.size(); i > 0; --i) {
+      if (line[i-1] == '#') {
+        end_pos = i-1;
+      }
+    }
     
+    if (end_pos != (size_t)-1)
+      line.erase(end_pos, line.size()); 
+
     /** Get the colon position */ 
     size_t start_pos = 0;
     end_pos = line.find(':');
@@ -261,14 +269,22 @@ bool Parse(char const *path, std::string &errmsg) {
           break;
 
           case ConfigData::CD_C_CALLBACK: {
-            if (data->config_cs.config_cb)
-              data->config_cs.config_cb(value, data->config_cs.args);
+            if (data->config_cs.config_cb && !data->config_cs.config_cb(value, data->config_cs.args)) {
+              errmsg += "Value error: Invalid value of field '";
+              errmsg.append(field.data(), field.size());
+              errmsg += "'";
+              return false;
+            }
           }
           break;
 
           case ConfigData::CD_CPP_CALLBACK: {
-            if (data->config_fn)
-              data->config_fn(value);
+            if (data->config_fn && !data->config_fn(value)) {
+              errmsg += "Value error: Invalid value of field '";
+              errmsg.append(field.data(), field.size());
+              errmsg += "'";
+              return false;
+            }
           }
           break;
         } 
@@ -276,11 +292,11 @@ bool Parse(char const *path, std::string &errmsg) {
         errmsg += path;
         errmsg += ':';
         errmsg += std::to_string(lineno);
-        errmsg += "\nField error: Unknown field name -- ";
-        errmsg += field.toString();
+        errmsg += "\nField error: Unknown field '";
+        errmsg.append(field.data(), field.size());
         return false;
       }
-    } else if (!line.empty()) {
+    } else if (!line.empty() && !std::all_of(line.begin(), line.end(), [](char c)  { return c == ' '; })) {
       errmsg += path;
       errmsg += ':';
       errmsg += std::to_string(lineno);
@@ -290,7 +306,9 @@ bool Parse(char const *path, std::string &errmsg) {
   }
 
   if (::feof(file) == 0) {
-    errmsg += "File error: Failed to read one line from ";
+    errmsg += "File error: Failed to read line ";
+    errmsg += std::to_string(lineno);
+    errmsg += " from ";
     errmsg += path;
     errmsg += "\nError Message: ";
     errmsg += strerror(errno);

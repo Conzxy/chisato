@@ -15,9 +15,9 @@ namespace chisato {
 
 /* Handle user-defined config type field
  * void* is the generic parameter */
-typedef void(*ConfigCallback)(StrSlice, void*);
+typedef bool(*ConfigCallback)(StrSlice, void*);
 /* lambda or std::bind can capture arguments */
-typedef std::function<void(StrSlice)> ConfigFunction;
+typedef std::function<bool(StrSlice)> ConfigFunction;
 
 /** Add string config field */
 void AddConfig(char const *field, std::string *str);
@@ -26,7 +26,7 @@ void AddConfig(char const *field, int *i);
 /** Add long config field */
 void AddConfig(char const *field, long *l);
 /** Add floating-point config field */
-void AddConfig(char const *field, double * d);
+void AddConfig(char const *field, double *d);
 /** Add boolean config field */
 void AddConfig(char const *field, bool *b);
 

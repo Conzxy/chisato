@@ -28,7 +28,7 @@ struct Config {
   bool boolean = false;
 };
 
-static inline void conv_efield(StrSlice value, void *args) {
+static inline bool conv_efield(StrSlice value, void *args) noexcept {
   TestEnum *config = (TestEnum*)args;
   if (value == "a")
     *config = T_A;
@@ -36,6 +36,9 @@ static inline void conv_efield(StrSlice value, void *args) {
     *config = T_B;
   else if (value == "c")
     *config = T_C;
+  else
+    return false;
+  return true;
 }
 
 int main(int argc, char **argv) {
@@ -47,7 +50,7 @@ int main(int argc, char **argv) {
   chisato::AddConfig("double", &config.dfield);
   chisato::AddConfig("enum", &config.efield, &conv_efield);
   chisato::AddConfig("enum1", [&config](StrSlice value) {
-      conv_efield(value, &config.efield2);
+      return conv_efield(value, &config.efield2);
   });
   chisato::AddConfig("bool", &config.boolean);
   
